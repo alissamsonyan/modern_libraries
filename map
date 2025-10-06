@@ -1,0 +1,56 @@
+#include <vector>
+#include <utility>
+
+template <typename K, typename V>
+class SimpleUnorderedMap {
+    static const size_t NUM_BUCKETS = 16;
+
+    struct Entry {
+        K key;
+        V value;
+        Entry(const K& k, const V& v) : key(k), value(v) {}
+    };
+
+    std::vector<Entry> buckets[NUM_BUCKETS];
+
+public:
+    void insert(const K& key, const V& value) {
+        size_t bucket_idx = std::hash<K>{}(key) % NUM_BUCKETS;
+        for (auto& e : buckets[bucket_idx]) {
+            if (e.key == key) {
+                e.value = value;
+                return;
+            }
+        }
+        buckets[bucket_idx].emplace_back(key, value);
+    }
+
+    class iterator {
+        SimpleUnorderedMap* map;
+        size_t bucket;
+        size_t pos;
+        void advance_to_valid() {
+            while (bucket < NUM_BUCKETS && pos >= map->buckets[bucket].size()) {
+                ++bucket;
+                pos = 0;
+            }
+        }
+    public:
+        iterator(SimpleUnorderedMap* m, size_t b, size_t p) : map(m), bucket(b), pos(p) {
+            advance_to_valid();
+        }
+        bool operator!=(const iterator& other) const {
+            return map != other.map || bucket != other.bucket || pos != other.pos;
+        }
+        std::pair<K, V>& operator*() {
+            return *reinterpret_cast<std::pair<K,V>*>(&map->buckets[bucket][pos]);
+        }
+        iterator& operator++() {
+            ++pos;
+            advance_to_valid();
+            return *this;
+        }
+    };
+    iterator begin() { return iterator(this, 0, 0); }
+    iterator end() { return iterator(this, NUM_BUCKETS, 0); }
+};
