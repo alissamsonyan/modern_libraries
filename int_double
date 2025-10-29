@@ -1,0 +1,27 @@
+#include <vector>
+#include <cmath>
+
+// 1. Find first positive double value
+double findFirstPositive(const std::vector<double>& arr) {
+    for (double x : arr) {
+        if (x > 0) {
+            return x;
+        }
+    }
+    return std::numeric_limits<double>::quiet_NaN(); // Not found indicator
+}
+
+// 2. Find first positive value where abs(double - int) == 1 (with floating-point tolerance)
+double findFirstPositiveIntDoubleDiffOne(const std::vector<double>& arr) {
+    const double tol = 1e-9;
+    for (double x : arr) {
+        if (x > 0) {
+            int x_int = static_cast<int>(x);
+            double diff = std::abs(x - x_int);
+            if (std::abs(diff - 1.0) < tol) {
+                return x;
+            }
+        }
+    }
+    return std::numeric_limits<double>::quiet_NaN(); // Not found indicator
+}
