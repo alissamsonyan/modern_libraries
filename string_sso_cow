@@ -1,0 +1,104 @@
+#include <cstring>
+#include <atomic>
+#include <cassert>
+
+class SsoCowString {
+public:
+    static constexpr size_t SSO22_BYTES = 22;
+    static constexpr size_t SSO30_BYTES = 30;
+    static constexpr size_t MAX_SSO_BYTES = SSO30_BYTES;
+private:
+    union {
+        struct {
+            char sso_data[MAX_SSO_BYTES + 1];
+            unsigned char sso_len;
+            unsigned char sso_flags;
+        } sso;
+        struct {
+            char* heap_data;
+            size_t heap_len;
+            std::atomic_uint* heap_refcount;
+        } heap;
+    } rep;
+
+    static constexpr unsigned char FLAG_SSO    = 0x80;
+    static constexpr unsigned char FLAG_SSO_22 = 0x40;
+    static constexpr unsigned char FLAG_SSO_30 = 0x00;
+
+    bool is_sso()   const { return rep.sso.sso_flags & FLAG_SSO; }
+    bool is_sso22() const { return (rep.sso.sso_flags & FLAG_SSO_22) != 0; }
+    void set_sso_flags(bool enable, bool sso22) {
+        rep.sso.sso_flags = enable ? FLAG_SSO : 0u;
+        if (enable && sso22) rep.sso.sso_flags |= FLAG_SSO_22;
+    }
+
+    void ref_heap() { if (!is_sso()) ++(*rep.heap.heap_refcount); }
+    void unref_heap() {
+        if (!is_sso() && --(*rep.heap.heap_refcount) == 0) {
+            delete[] rep.heap.heap_data;
+            delete rep.heap.heap_refcount;
+        }
+    }
+public:
+    SsoCowString() {
+        set_sso_flags(true, true);
+        rep.sso.sso_len = 0;
+        rep.sso.sso_data[0] = '\0';
+    }
+    SsoCowString(const char* str) {
+        size_t len = strlen(str);
+        if (len <= SSO22_BYTES) {
+            set_sso_flags(true, true);
+            rep.sso.sso_len = (unsigned char)len;
+            memcpy(rep.sso.sso_data, str, len + 1);
+        } else if (len <= SSO30_BYTES) {
+            set_sso_flags(true, false);
+            rep.sso.sso_len = (unsigned char)len;
+            memcpy(rep.sso.sso_data, str, len + 1);
+        } else {
+            set_sso_flags(false, false);
+            rep.heap.heap_data = new char[len + 1];
+            memcpy(rep.heap.heap_data, str, len + 1);
+            rep.heap.heap_len = len;
+            rep.heap.heap_refcount = new std::atomic_uint(1);
+        }
+    }
+    SsoCowString(const SsoCowString& other) {
+        if (other.is_sso()) {
+            rep = other.rep;
+        } else {
+            rep = other.rep;
+            ref_heap();
+        }
+    }
+    SsoCowString& operator=(const SsoCowString& other) {
+        if (this == &other) return *this;
+        if (!is_sso()) unref_heap();
+        if (other.is_sso()) {
+            rep = other.rep;
+        } else {
+            rep = other.rep;
+            ref_heap();
+        }
+        return *this;
+    }
+    ~SsoCowString() { if (!is_sso()) unref_heap(); }
+    const char* data()  const { return is_sso() ? rep.sso.sso_data : rep.heap.heap_data; }
+    size_t size()       const { return is_sso() ? rep.sso.sso_len : rep.heap.heap_len; }
+    bool empty()        const { return size() == 0; }
+    void mutate_char(size_t pos, char c) {
+        assert(pos < size());
+        if (is_sso()) {
+            rep.sso.sso_data[pos] = c;
+        } else {
+            if (*rep.heap.heap_refcount > 1) {
+                char* new_data = new char[rep.heap.heap_len + 1];
+                memcpy(new_data, rep.heap.heap_data, rep.heap.heap_len + 1);
+                unref_heap();
+                rep.heap.heap_data = new_data;
+                rep.heap.heap_refcount = new std::atomic_uint(1);
+            }
+            rep.heap.heap_data[pos] = c;
+        }
+    }
+};
