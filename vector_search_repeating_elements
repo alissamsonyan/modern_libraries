@@ -1,0 +1,28 @@
+#include <iostream>
+#include <vector>
+#include <unordered_map>
+
+int main() {
+// Vector with 1 repeating element
+    std::vector<int> v1 = {3, 7, 2, 5, 7};
+    std::unordered_map<int, int> count1;
+    for (int num : v1) count1[num]++;
+    std::cout << "Repeating elements in v1: ";
+    for (const auto& pair : count1) {
+        if (pair.second > 1)
+            std::cout << pair.first << " ";
+    }
+    std::cout << std::endl;
+
+    // Vector with 2 repeating elements
+    std::vector<int> v2 = {4, 2, 9, 4, 6, 2, 8};
+    std::unordered_map<int, int> count2;
+    for (int num : v2) count2[num]++;
+    std::cout << "Repeating elements in v2: ";
+    for (const auto& pair : count2) {
+        if (pair.second > 1)
+            std::cout << pair.first << " ";
+    }
+    std::cout << std::endl;
+    return 0;
+}
