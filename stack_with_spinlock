@@ -1,0 +1,25 @@
+#include <atomic>
+#include <vector>
+
+class SpinLock {
+    std::atomic_flag flag = ATOMIC_FLAG_INIT;
+public:
+    void lock() { while (flag.test_and_set(std::memory_order_acquire)) {} }
+    void unlock() { flag.clear(std::memory_order_release); }
+};
+
+std::vector<int> shared_stack;
+SpinLock stack_lock;
+
+bool pop_stack(int& out_value) {
+    stack_lock.lock();
+    if (!shared_stack.empty()) {
+        out_value = shared_stack.back();
+        shared_stack.pop_back();
+        stack_lock.unlock();
+        return true;
+    } else {
+        stack_lock.unlock();
+        return false;
+    }
+}
